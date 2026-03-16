@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cosmic Foundry</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header class="top-bar">
+        <h1>Cosmic Foundry</h1>
+        <div id="statusText">Bootstrapping colony protocols…</div>
+        <button id="prestigeBtn" class="danger">Cosmic Reformation</button>
+      </header>
+
+      <aside class="left-panel">
+        <section>
+          <h2>Resources</h2>
+          <div id="resourceList" class="grid-list"></div>
+        </section>
+        <section>
+          <h2>Energy</h2>
+          <div id="energyText"></div>
+        </section>
+        <section>
+          <h2>Automation</h2>
+          <div id="automationText"></div>
+          <button id="manualMineBtn">Manual Mine Rock (+1)</button>
+        </section>
+      </aside>
+
+      <main class="viewport-wrap">
+        <canvas id="planetCanvas" width="1200" height="740"></canvas>
+        <div class="hud-overlay">
+          <span id="planetLabel"></span>
+          <span id="cameraLabel"></span>
+        </div>
+      </main>
+
+      <aside class="right-panel">
+        <section>
+          <h2>Build Menu</h2>
+          <div id="buildMenu" class="grid-list"></div>
+          <button id="connectModeBtn">Connection Tool: OFF</button>
+          <div class="small">Click source building, then destination building.</div>
+        </section>
+        <section>
+          <h2>Research</h2>
+          <div id="researchList" class="grid-list"></div>
+        </section>
+        <section>
+          <h2>Planet & Expansion</h2>
+          <div id="planetActions" class="grid-list"></div>
+        </section>
+        <section>
+          <h2>Selected</h2>
+          <div id="selectionText">Nothing selected.</div>
+          <div id="selectionActions" class="grid-list"></div>
+        </section>
+      </aside>
+    </div>
+
+    <script type="module" src="game.js"></script>
+  </body>
+</html>
