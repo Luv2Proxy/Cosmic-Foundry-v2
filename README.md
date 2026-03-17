@@ -1,38 +1,41 @@
-# Cosmic Foundry — 3D Modular Factory Planet
+# Cosmic Foundry — Babylon.js 3D Planet Rewrite
 
-This prototype is now focused on a **3D circular planet** with visible ore crystals, 3D-styled buildings and conveyors, a starter quest tree, and data-driven content definitions.
+This version now uses **Babylon.js** as requested.
 
-## What Changed
+## What changed
 
-- **Visible ore nodes** are rendered as crystal meshes (not flat markers).
-- **3D-like building rendering** on the planetary surface.
-- **3D conveyor visualization** with animated moving payloads.
-- **Quest Tree** to guide player progression and clarify what to do next.
-- **Objective panel** with current recommended action.
-- **Modular architecture** through centralized `DEFINITIONS`:
-  - `DEFINITIONS.resources`
-  - `DEFINITIONS.buildings`
-  - `DEFINITIONS.recipes`
-  - `DEFINITIONS.oreNodes`
-  - `DEFINITIONS.quests`
+- Replaced the prior rendering path with Babylon.js scene/camera/light/mesh pipeline.
+- Planet is a true 3D sphere with orbit camera controls.
+- Ore nodes render as colored mesh **splotches + crystal meshes**.
+- Buildings are 3D meshes and can be placed **anywhere on the planet**.
+- **Miner placement remains ore-node-only**.
 
-## Controls
+## Crafting logic fix
 
-- Drag: rotate / tilt planet
-- Mouse wheel: zoom
-- Build menu: select building and click valid placement
-- Conveyor tool: click source building, then destination building
-- Manual Gather Rock for early startup
-- Select building to upgrade and cycle recipes
+Factory flow is now strict and correct:
 
-## How To Extend Content
+- Buildings craft from `input` using selected recipe.
+- Crafted items are written to `output`.
+- Conveyors move **source `output` -> destination `input`**.
+- Storage converts incoming items into wallet resources.
 
-To add new content, update `DEFINITIONS` in `game.js`:
+This prevents raw input pass-through behavior.
 
-1. Add resource key in `resources`.
-2. Add building in `buildings` (optionally with `recipeType`).
-3. Add recipes in `recipes[recipeType]` with `{ in, out }`.
-4. Add ore nodes in `oreNodes`.
-5. Add quest entries in `quests` with a custom `isDone(state)` function.
+## Manual gathering
 
-This allows rapid iteration without changing the core simulation loop.
+- Gather Rock
+- Gather Wood
+- Gather Biomass
+
+Biomass Burners consume Biomass to generate energy.
+
+## Modular content
+
+Content is centralized in `DEF` in `game.js`:
+
+- `DEF.resources`
+- `DEF.buildings`
+- `DEF.recipes`
+- `DEF.nodes`
+
+Add new buildings/recipes/resources by extending these definitions.

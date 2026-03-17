@@ -10,8 +10,7 @@
     <div id="app">
       <header class="top-bar">
         <h1>Cosmic Foundry</h1>
-        <div id="statusText">Bootstrapping colony protocols…</div>
-        <button id="prestigeBtn" class="danger">Cosmic Reformation</button>
+        <div id="statusText">Initializing planetary fabricator…</div>
       </header>
 
       <aside class="left-panel">
@@ -20,17 +19,16 @@
           <div id="resourceList" class="grid-list"></div>
         </section>
         <section>
+          <h2>Manual Gathering</h2>
+          <div class="grid-list">
+            <button id="gatherRockBtn">Gather Rock (+4)</button>
+            <button id="gatherWoodBtn">Gather Wood (+3)</button>
+            <button id="gatherBiomassBtn">Gather Biomass (+2)</button>
+          </div>
+        </section>
+        <section>
           <h2>Energy</h2>
           <div id="energyText"></div>
-        </section>
-        <section>
-          <h2>Automation</h2>
-          <div id="automationText"></div>
-          <button id="manualMineBtn">Manual Gather Rock (+4)</button>
-        </section>
-        <section>
-          <h2>What to do next</h2>
-          <div id="objectiveText" class="small"></div>
         </section>
       </aside>
 
@@ -47,11 +45,11 @@
           <h2>Build Menu</h2>
           <div id="buildMenu" class="grid-list"></div>
           <button id="connectModeBtn">Conveyor Tool: OFF</button>
-          <div class="small">Click source building, then destination building to place a conveyor.</div>
+          <div class="small">Conveyors move source OUTPUT -> destination INPUT.</div>
         </section>
         <section>
-          <h2>Quest Tree</h2>
-          <div id="questTree" class="grid-list"></div>
+          <h2>Objectives</h2>
+          <div id="objectiveText" class="small"></div>
         </section>
         <section>
           <h2>Selected</h2>
@@ -61,6 +59,7 @@
       </aside>
     </div>
 
-    <script type="module" src="game.js"></script>
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="game.js"></script>
   </body>
 </html>

@@ -143,3 +143,7 @@ button.danger {
   font-size: 0.8rem;
   opacity: 0.82;
 }
+
+#objectiveText {
+  white-space: pre-line;
+}

@@ -1,585 +1,498 @@
-const TAU = Math.PI * 2;
-
-const DEFINITIONS = {
-  resources: ["Rock", "Iron Ore", "Copper Ore", "Limestone", "Iron Ingot", "Copper Ingot", "Iron Plate", "Wire", "Concrete"],
-  buildings: {
-    miner: { name: "Miner", color: "#f6c177", power: 3, cost: { Rock: 10 }, nodeOnly: true, recipeType: null },
-    smelter: { name: "Smelter", color: "#ef6f6c", power: 5, cost: { Rock: 12 }, nodeOnly: false, recipeType: "smelter" },
-    constructor: { name: "Constructor", color: "#8ecae6", power: 6, cost: { Rock: 16 }, nodeOnly: false, recipeType: "constructor" },
-    storage: { name: "Storage", color: "#b39ddb", power: 1, cost: { Rock: 10 }, nodeOnly: false, recipeType: null },
-    power: { name: "Biomass Burner", color: "#80ed99", power: -18, cost: { Rock: 14 }, nodeOnly: false, recipeType: null },
-  },
-  recipes: {
-    smelter: {
-      iron: { label: "Iron Ingot", in: { "Iron Ore": 1 }, out: { "Iron Ingot": 1 } },
-      copper: { label: "Copper Ingot", in: { "Copper Ore": 1 }, out: { "Copper Ingot": 1 } },
+(function () {
+  const DEF = {
+    resources: ["Rock", "Wood", "Biomass", "Iron Ore", "Copper Ore", "Limestone", "Iron Ingot", "Copper Ingot", "Iron Plate", "Wire", "Concrete"],
+    buildings: {
+      miner: { name: "Miner", cost: { Rock: 12 }, color: "#f6c177", nodeOnly: true, power: 3, recipeType: null },
+      smelter: { name: "Smelter", cost: { Rock: 15 }, color: "#ef6f6c", nodeOnly: false, power: 6, recipeType: "smelter" },
+      constructor: { name: "Constructor", cost: { Rock: 20, "Iron Ingot": 4 }, color: "#8ecae6", nodeOnly: false, power: 7, recipeType: "constructor" },
+      storage: { name: "Storage", cost: { Rock: 12 }, color: "#b39ddb", nodeOnly: false, power: 1, recipeType: null },
+      biomassBurner: { name: "Biomass Burner", cost: { Rock: 18, Wood: 8 }, color: "#80ed99", nodeOnly: false, power: -24, recipeType: null },
     },
-    constructor: {
-      plate: { label: "Iron Plate", in: { "Iron Ingot": 2 }, out: { "Iron Plate": 1 } },
-      wire: { label: "Wire", in: { "Copper Ingot": 1 }, out: { Wire: 2 } },
-      concrete: { label: "Concrete", in: { Limestone: 3 }, out: { Concrete: 1 } },
+    recipes: {
+      smelter: {
+        ironIngot: { label: "Iron Ingot", in: { "Iron Ore": 1 }, out: { "Iron Ingot": 1 } },
+        copperIngot: { label: "Copper Ingot", in: { "Copper Ore": 1 }, out: { "Copper Ingot": 1 } },
+      },
+      constructor: {
+        ironPlate: { label: "Iron Plate", in: { "Iron Ingot": 2 }, out: { "Iron Plate": 1 } },
+        wire: { label: "Wire", in: { "Copper Ingot": 1 }, out: { Wire: 2 } },
+        concrete: { label: "Concrete", in: { Limestone: 3 }, out: { Concrete: 1 } },
+      },
     },
-  },
-  oreNodes: [
-    { lat: 0.14, lon: 0.3, type: "Iron Ore", richness: 1 },
-    { lat: -0.26, lon: 1.1, type: "Copper Ore", richness: 1 },
-    { lat: 0.42, lon: 2.0, type: "Limestone", richness: 1.2 },
-    { lat: -0.13, lon: 2.9, type: "Iron Ore", richness: 1 },
-    { lat: 0.28, lon: 4.1, type: "Copper Ore", richness: 0.95 },
-    { lat: -0.44, lon: 5.2, type: "Limestone", richness: 1.1 },
-  ],
-  quests: [
-    { id: "gather", title: "Gather Resources", hint: "Use Manual Gather Rock until you have 20 Rock.", isDone: (s) => s.wallet.Rock >= 20 },
-    { id: "miner", title: "Place First Miner", hint: "Select Miner and click an ore crystal on the planet.", isDone: (s) => s.buildings.some((b) => b.type === "miner") },
-    {
-      id: "smelter",
-      title: "Smelt Ore",
-      hint: "Place a Smelter on the edge ring and connect Miner -> Smelter with conveyor.",
-      isDone: (s) => s.wallet["Iron Ingot"] >= 5 || s.wallet["Copper Ingot"] >= 5,
-    },
-    {
-      id: "constructor",
-      title: "Craft Components",
-      hint: "Place Constructor and route ingots into it. Produce Iron Plate, Wire, or Concrete.",
-      isDone: (s) => s.wallet["Iron Plate"] >= 5 || s.wallet.Wire >= 8 || s.wallet.Concrete >= 5,
-    },
-    {
-      id: "power",
-      title: "Stabilize Power",
-      hint: "Build at least one Biomass Burner to keep your factory from slowing down.",
-      isDone: (s) => s.buildings.some((b) => b.type === "power"),
-    },
-  ],
-};
-
-const state = {
-  wallet: Object.fromEntries(DEFINITIONS.resources.map((r) => [r, 0])),
-  rates: {},
-  selectedBuild: null,
-  conveyorMode: false,
-  conveyorStart: null,
-  selectedBuildingId: null,
-  rotation: 0.16,
-  tilt: 0,
-  zoom: 1,
-  dragging: false,
-  dragDistance: 0,
-  lastMouse: null,
-  nodes: DEFINITIONS.oreNodes.map((n, i) => ({ ...n, id: `node-${i}`, minerId: null })),
-  buildings: [],
-  conveyors: [],
-  energyProduced: 0,
-  energyDemand: 0,
-  powerRatio: 1,
-  tick: 0,
-  questsCompleted: new Set(),
-};
-state.wallet.Rock = 120;
-
-const canvas = document.getElementById("planetCanvas");
-const ctx = canvas.getContext("2d");
-const statusText = document.getElementById("statusText");
-const resourceList = document.getElementById("resourceList");
-const energyText = document.getElementById("energyText");
-const automationText = document.getElementById("automationText");
-const objectiveText = document.getElementById("objectiveText");
-const buildMenu = document.getElementById("buildMenu");
-const connectModeBtn = document.getElementById("connectModeBtn");
-const questTree = document.getElementById("questTree");
-const selectionText = document.getElementById("selectionText");
-const selectionActions = document.getElementById("selectionActions");
-const planetLabel = document.getElementById("planetLabel");
-const cameraLabel = document.getElementById("cameraLabel");
-
-document.getElementById("prestigeBtn").style.display = "none";
-document.getElementById("manualMineBtn").addEventListener("click", () => {
-  state.wallet.Rock += 4;
-  setStatus("Gathered Rock manually.");
-  renderSidePanels();
-});
-
-function setStatus(msg) {
-  statusText.textContent = msg;
-}
-
-function project(lat, lon) {
-  const w = canvas.width;
-  const h = canvas.height;
-  const R = Math.min(w, h) * 0.34 * state.zoom;
-  const a = lon + state.rotation;
-  const x = Math.cos(lat) * Math.sin(a);
-  const y = Math.sin(lat);
-  const z = Math.cos(lat) * Math.cos(a);
-  const perspective = 0.52 + (z + 1) * 0.28;
-  return { x: w / 2 + x * R * perspective, y: h / 2 + y * R + state.tilt, z, visible: z > -0.22 };
-}
-
-function canAfford(cost) {
-  return Object.entries(cost).every(([r, v]) => (state.wallet[r] || 0) >= v);
-}
-function spend(cost) {
-  Object.entries(cost).forEach(([r, v]) => (state.wallet[r] -= v));
-}
-
-function getRecipeKeys(buildingType) {
-  const recipeType = DEFINITIONS.buildings[buildingType].recipeType;
-  return recipeType ? Object.keys(DEFINITIONS.recipes[recipeType]) : [];
-}
-
-function createBuilding(type, lat, lon, nodeId = null) {
-  const keys = getRecipeKeys(type);
-  return {
-    id: `b-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-    type,
-    lat,
-    lon,
-    nodeId,
-    level: 1,
-    mode: keys[0] || "default",
-    inv: {},
+    nodes: [
+      { lat: 0.25, lon: 0.2, type: "Iron Ore", richness: 1.1, color: "#b8c2cf" },
+      { lat: -0.2, lon: 1.3, type: "Copper Ore", richness: 1.0, color: "#ffb26b" },
+      { lat: 0.4, lon: 2.2, type: "Limestone", richness: 1.2, color: "#b7f5df" },
+      { lat: -0.1, lon: 3.0, type: "Iron Ore", richness: 0.9, color: "#b8c2cf" },
+      { lat: 0.33, lon: 4.15, type: "Copper Ore", richness: 1.1, color: "#ffb26b" },
+      { lat: -0.35, lon: 5.0, type: "Limestone", richness: 1.0, color: "#b7f5df" },
+    ],
   };
-}
 
-function pickNode(mx, my) {
-  let hit = null;
-  let best = Infinity;
-  state.nodes.forEach((n) => {
-    const p = project(n.lat, n.lon);
-    if (!p.visible) return;
-    const d = Math.hypot(mx - p.x, my - p.y);
-    if (d < 20 && d < best) {
-      best = d;
-      hit = n;
-    }
-  });
-  return hit;
-}
+  const state = {
+    wallet: Object.fromEntries(DEF.resources.map((r) => [r, 0])),
+    rates: {},
+    selectedBuild: null,
+    conveyorMode: false,
+    conveyorStartId: null,
+    selectedBuildingId: null,
+    nodes: DEF.nodes.map((n, i) => ({ id: `node-${i}`, ...n, minerId: null, marker: null })),
+    buildings: [],
+    conveyors: [],
+    energyProduced: 0,
+    energyDemand: 0,
+    powerRatio: 1,
+    tick: 0,
+    objectives: [
+      { text: "Gather Wood + Biomass + Rock", done: (s) => s.wallet.Rock >= 20 && s.wallet.Wood >= 10 && s.wallet.Biomass >= 6 },
+      { text: "Place Miner on an ore node splotch", done: (s) => s.buildings.some((b) => b.type === "miner") },
+      { text: "Place Smelter and connect Miner -> Smelter", done: (s) => s.conveyors.some((c) => s.getBuilding(c.from)?.type === "miner" && s.getBuilding(c.to)?.type === "smelter") },
+      { text: "Craft with Constructor", done: (s) => s.wallet["Iron Plate"] + s.wallet.Wire + s.wallet.Concrete >= 8 },
+    ],
+    completed: new Set(),
+    getBuilding(id) {
+      return this.buildings.find((b) => b.id === id);
+    },
+  };
 
-function pickBuilding(mx, my) {
-  let hit = null;
-  let best = Infinity;
-  state.buildings.forEach((b) => {
-    const p = project(b.lat, b.lon);
-    if (!p.visible) return;
-    const d = Math.hypot(mx - p.x, my - p.y);
-    if (d < 19 && d < best) {
-      best = d;
-      hit = b;
-    }
-  });
-  return hit;
-}
+  state.wallet.Rock = 140;
+  state.wallet.Wood = 20;
+  state.wallet.Biomass = 10;
 
-function placeBuilding(mx, my) {
-  if (!state.selectedBuild) return false;
+  const els = {
+    canvas: document.getElementById("planetCanvas"),
+    status: document.getElementById("statusText"),
+    resourceList: document.getElementById("resourceList"),
+    energy: document.getElementById("energyText"),
+    objective: document.getElementById("objectiveText"),
+    buildMenu: document.getElementById("buildMenu"),
+    connect: document.getElementById("connectModeBtn"),
+    selection: document.getElementById("selectionText"),
+    selectionActions: document.getElementById("selectionActions"),
+    planetLabel: document.getElementById("planetLabel"),
+    cameraLabel: document.getElementById("cameraLabel"),
+  };
 
-  const def = DEFINITIONS.buildings[state.selectedBuild];
-  if (!canAfford(def.cost)) {
-    setStatus(`Not enough resources for ${def.name}.`);
-    return true;
+  const engine = new BABYLON.Engine(els.canvas, true, { preserveDrawingBuffer: true, stencil: true });
+  const scene = new BABYLON.Scene(engine);
+  scene.clearColor = new BABYLON.Color4(0.04, 0.07, 0.12, 1);
+
+  const camera = new BABYLON.ArcRotateCamera("cam", -Math.PI / 2, 1.1, 11, BABYLON.Vector3.Zero(), scene);
+  camera.attachControl(els.canvas, true);
+  camera.lowerRadiusLimit = 6;
+  camera.upperRadiusLimit = 16;
+
+  new BABYLON.HemisphericLight("hemi", new BABYLON.Vector3(1, 1, 0), scene).intensity = 0.8;
+  const dir = new BABYLON.DirectionalLight("dir", new BABYLON.Vector3(-1, -2, -1), scene);
+  dir.position = new BABYLON.Vector3(6, 8, 5);
+
+  const planetRadius = 3.2;
+  const planet = BABYLON.MeshBuilder.CreateSphere("planet", { diameter: planetRadius * 2, segments: 64 }, scene);
+  const pMat = new BABYLON.StandardMaterial("planetMat", scene);
+  pMat.diffuseColor = new BABYLON.Color3(0.19, 0.29, 0.43);
+  pMat.specularColor = new BABYLON.Color3(0.08, 0.12, 0.2);
+  planet.material = pMat;
+
+  const ring = BABYLON.MeshBuilder.CreateTorus("ring", { diameter: planetRadius * 2.05, thickness: 0.07, tessellation: 96 }, scene);
+  ring.rotation.x = Math.PI / 2;
+  const rMat = new BABYLON.StandardMaterial("ringMat", scene);
+  rMat.emissiveColor = new BABYLON.Color3(0.35, 0.65, 0.95);
+  rMat.alpha = 0.45;
+  ring.material = rMat;
+
+  const nodeMeshes = [];
+  const conveyorMeshes = [];
+  const buildingMeshes = [];
+
+  function hexColor(hex) {
+    return BABYLON.Color3.FromHexString(hex);
   }
 
-  if (def.nodeOnly) {
-    const node = pickNode(mx, my);
-    if (!node) return setStatus("Miners must be placed directly on ore crystals."), true;
-    if (node.minerId) return setStatus("Ore node already has a miner."), true;
-    const b = createBuilding(state.selectedBuild, node.lat, node.lon, node.id);
-    node.minerId = b.id;
+  function sphToVec(lat, lon, r = planetRadius) {
+    return new BABYLON.Vector3(r * Math.cos(lat) * Math.sin(lon), r * Math.sin(lat), r * Math.cos(lat) * Math.cos(lon));
+  }
+
+  function vecToLatLon(v) {
+    const n = v.normalize();
+    return { lat: Math.asin(n.y), lon: Math.atan2(n.x, n.z) };
+  }
+
+  function setStatus(t) {
+    els.status.textContent = t;
+  }
+
+  function canAfford(cost) {
+    return Object.entries(cost).every(([r, v]) => (state.wallet[r] || 0) >= v);
+  }
+
+  function spend(cost) {
+    Object.entries(cost).forEach(([r, v]) => (state.wallet[r] -= v));
+  }
+
+  function recipeKeys(type) {
+    const rt = DEF.buildings[type].recipeType;
+    return rt ? Object.keys(DEF.recipes[rt]) : [];
+  }
+
+  function createBuilding(type, lat, lon, nodeId = null) {
+    return { id: `b-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, type, lat, lon, nodeId, level: 1, mode: recipeKeys(type)[0] || "default", input: {}, output: {}, mesh: null };
+  }
+
+  function createNodeSplotch(node) {
+    const pos = sphToVec(node.lat, node.lon, planetRadius + 0.01);
+    const up = pos.normalize();
+
+    const splotch = BABYLON.MeshBuilder.CreateDisc(`s-${node.id}`, { radius: 0.52, tessellation: 36 }, scene);
+    splotch.position = pos;
+    splotch.lookAt(pos.add(up));
+
+    const sMat = new BABYLON.StandardMaterial(`sm-${node.id}`, scene);
+    sMat.diffuseColor = hexColor(node.color);
+    sMat.alpha = 0.45;
+    splotch.material = sMat;
+
+    const crystal = BABYLON.MeshBuilder.CreatePolyhedron(`c-${node.id}`, { type: 1, size: 0.15 }, scene);
+    crystal.position = pos.add(up.scale(0.14));
+    const cMat = new BABYLON.StandardMaterial(`cm-${node.id}`, scene);
+    cMat.diffuseColor = hexColor(node.color);
+    cMat.emissiveColor = hexColor(node.color).scale(0.35);
+    crystal.material = cMat;
+
+    node.marker = crystal;
+    nodeMeshes.push(splotch, crystal);
+  }
+
+  state.nodes.forEach(createNodeSplotch);
+
+  function createBuildingMesh(building) {
+    const color = hexColor(DEF.buildings[building.type].color);
+    const body = BABYLON.MeshBuilder.CreateCylinder(`b-${building.id}`, { height: 0.4, diameterTop: 0.34, diameterBottom: 0.42, tessellation: 14 }, scene);
+    const roof = BABYLON.MeshBuilder.CreateCylinder(`r-${building.id}`, { height: 0.18, diameterTop: 0.05, diameterBottom: 0.24, tessellation: 12 }, scene);
+    const root = BABYLON.Mesh.MergeMeshes([body, roof], true, false, undefined, false, true);
+
+    const pos = sphToVec(building.lat, building.lon, planetRadius + 0.25);
+    root.position = pos;
+    root.lookAt(pos.add(pos.normalize()));
+
+    const mat = new BABYLON.StandardMaterial(`bm-${building.id}`, scene);
+    mat.diffuseColor = color;
+    mat.specularColor = color.scale(0.2);
+    root.material = mat;
+    root.isPickable = true;
+
+    building.mesh = root;
+    buildingMeshes.push(root);
+  }
+
+  function rebuildConveyorMeshes() {
+    while (conveyorMeshes.length) {
+      const m = conveyorMeshes.pop();
+      m.dispose();
+    }
+
+    state.conveyors.forEach((c, idx) => {
+      const from = state.getBuilding(c.from);
+      const to = state.getBuilding(c.to);
+      if (!from || !to) return;
+
+      const a = sphToVec(from.lat, from.lon, planetRadius + 0.25);
+      const b = sphToVec(to.lat, to.lon, planetRadius + 0.25);
+      const mid = a.add(b).scale(0.5).normalize().scale(planetRadius + 0.7);
+
+      const path = BABYLON.Curve3.CreateQuadraticBezier(a, mid, b, 24).getPoints();
+      const tube = BABYLON.MeshBuilder.CreateTube(`t-${idx}`, { path, radius: 0.035, tessellation: 10 }, scene);
+      const tm = new BABYLON.StandardMaterial(`tm-${idx}`, scene);
+      tm.diffuseColor = new BABYLON.Color3(0.53, 0.83, 0.95);
+      tm.emissiveColor = new BABYLON.Color3(0.12, 0.25, 0.35);
+      tube.material = tm;
+
+      const payload = BABYLON.MeshBuilder.CreateSphere(`p-${idx}`, { diameter: 0.1 }, scene);
+      const pm = new BABYLON.StandardMaterial(`pm-${idx}`, scene);
+      pm.diffuseColor = idx % 2 ? new BABYLON.Color3(1, 1, 1) : new BABYLON.Color3(0.5, 1, 0.8);
+      pm.emissiveColor = pm.diffuseColor.scale(0.5);
+      payload.material = pm;
+
+      c.path = path;
+      c.payload = payload;
+      conveyorMeshes.push(tube, payload);
+    });
+  }
+
+  function placeBuildingAtPick(pick) {
+    if (!state.selectedBuild) return false;
+    const type = state.selectedBuild;
+    const def = DEF.buildings[type];
+    if (!canAfford(def.cost)) return setStatus("Not enough resources."), true;
+
+    const point = pick.pickedPoint;
+    const ll = vecToLatLon(point);
+
+    if (def.nodeOnly) {
+      const node = state.nodes.find((n) => BABYLON.Vector3.Distance(sphToVec(n.lat, n.lon, planetRadius), point.normalize().scale(planetRadius)) < 0.5);
+      if (!node) return setStatus("Miner must be placed on ore node splotch."), true;
+      if (node.minerId) return setStatus("Node already occupied."), true;
+      const b = createBuilding(type, node.lat, node.lon, node.id);
+      node.minerId = b.id;
+      createBuildingMesh(b);
+      state.buildings.push(b);
+      spend(def.cost);
+      state.selectedBuildingId = b.id;
+      rebuildConveyorMeshes();
+      renderSelection();
+      return setStatus(`Placed Miner on ${node.type}.`), true;
+    }
+
+    const pos = point.normalize().scale(planetRadius + 0.25);
+    const tooClose = state.buildings.some((b) => BABYLON.Vector3.Distance(sphToVec(b.lat, b.lon, planetRadius + 0.25), pos) < 0.45);
+    if (tooClose) return setStatus("Too close to another building."), true;
+
+    const b = createBuilding(type, ll.lat, ll.lon);
+    createBuildingMesh(b);
     state.buildings.push(b);
     spend(def.cost);
     state.selectedBuildingId = b.id;
-    setStatus(`Placed Miner on ${node.type}.`);
+    rebuildConveyorMeshes();
     renderSelection();
-    return true;
+    return setStatus(`Placed ${def.name}.`), true;
   }
 
-  const centerX = canvas.width / 2;
-  const centerY = canvas.height / 2 + state.tilt;
-  const planetR = Math.min(canvas.width, canvas.height) * 0.34 * state.zoom;
-  const d = Math.hypot(mx - centerX, my - centerY);
-  if (Math.abs(d - planetR) > 92) {
-    setStatus("Place this building on the bright edge ring of the planet.");
-    return true;
+  function pickBuildingFromMesh(mesh) {
+    return state.buildings.find((b) => b.mesh === mesh || b.mesh?.getChildMeshes().includes(mesh)) || null;
   }
 
-  const lat = Math.max(-1.2, Math.min(1.2, (my - centerY) / planetR));
-  const lon = Math.atan2(mx - centerX, Math.sqrt(Math.max(0.0001, planetR * planetR - (mx - centerX) ** 2 - (my - centerY) ** 2))) - state.rotation;
-
-  const occupied = state.buildings.some((b) => Math.abs(b.lat - lat) < 0.08 && Math.abs(b.lon - lon) < 0.12);
-  if (occupied) return setStatus("Too close to another building."), true;
-
-  const b = createBuilding(state.selectedBuild, lat, lon);
-  state.buildings.push(b);
-  spend(def.cost);
-  state.selectedBuildingId = b.id;
-  setStatus(`Placed ${def.name} on planetary edge.`);
-  renderSelection();
-  return true;
-}
-
-function placeConveyor(mx, my) {
-  const hit = pickBuilding(mx, my);
-  if (!hit) return setStatus("Conveyor endpoints must be buildings."), true;
-  if (!state.conveyorStart) {
-    state.conveyorStart = hit.id;
-    return setStatus("Selected conveyor source."), true;
-  }
-  if (state.conveyorStart === hit.id) return setStatus("Cannot connect building to itself."), true;
-  const exists = state.conveyors.some((c) => c.from === state.conveyorStart && c.to === hit.id);
-  if (exists) {
-    state.conveyorStart = null;
-    return setStatus("Conveyor already exists."), true;
-  }
-  state.conveyors.push({ from: state.conveyorStart, to: hit.id, t: Math.random() });
-  state.conveyorStart = null;
-  setStatus("Conveyor built.");
-  return true;
-}
-
-function addInv(building, res, amount) {
-  building.inv[res] = (building.inv[res] || 0) + amount;
-}
-function takeInv(building, res, amount) {
-  if ((building.inv[res] || 0) < amount) return false;
-  building.inv[res] -= amount;
-  return true;
-}
-
-function processBuilding(building, ratio) {
-  const speed = ratio * (1 + (building.level - 1) * 0.2);
-  if (building.type === "miner") {
-    const node = state.nodes.find((n) => n.id === building.nodeId);
-    if (node) addInv(building, node.type, 0.55 * speed * node.richness);
-    return;
+  function addOut(b, r, q) {
+    b.output[r] = (b.output[r] || 0) + q;
   }
 
-  const recipeType = DEFINITIONS.buildings[building.type].recipeType;
-  if (!recipeType) return;
+  function processBuilding(b, ratio) {
+    const speed = ratio * (1 + (b.level - 1) * 0.2);
 
-  const recipe = DEFINITIONS.recipes[recipeType][building.mode];
-  if (!recipe) return;
-
-  const canCraft = Object.entries(recipe.in).every(([r, v]) => (building.inv[r] || 0) >= v * speed);
-  if (!canCraft) return;
-
-  Object.entries(recipe.in).forEach(([r, v]) => {
-    building.inv[r] -= v * speed;
-  });
-  Object.entries(recipe.out).forEach(([r, v]) => addInv(building, r, v * speed));
-}
-
-function moveConveyor(conveyor, ratio) {
-  const from = state.buildings.find((b) => b.id === conveyor.from);
-  const to = state.buildings.find((b) => b.id === conveyor.to);
-  if (!from || !to) return;
-
-  const item = Object.entries(from.inv).find(([, qty]) => qty > 0.2);
-  if (!item) return;
-
-  const [resName] = item;
-  const amount = 0.45 * ratio;
-  if (!takeInv(from, resName, amount)) return;
-
-  if (to.type === "storage") {
-    state.wallet[resName] = (state.wallet[resName] || 0) + amount;
-  } else {
-    addInv(to, resName, amount);
-  }
-}
-
-function updateSimulation() {
-  const before = structuredClone(state.wallet);
-
-  state.energyProduced = 0;
-  state.energyDemand = 0;
-  state.buildings.forEach((b) => {
-    const p = DEFINITIONS.buildings[b.type].power;
-    if (p < 0) state.energyProduced += Math.abs(p) * (1 + (b.level - 1) * 0.3);
-    else state.energyDemand += p;
-  });
-
-  state.powerRatio = Math.min(1, state.energyProduced / Math.max(1, state.energyDemand));
-
-  state.buildings.forEach((b) => processBuilding(b, state.powerRatio));
-  state.conveyors.forEach((c) => moveConveyor(c, state.powerRatio));
-
-  state.rates = {};
-  Object.keys(state.wallet).forEach((r) => {
-    state.rates[r] = (state.wallet[r] - before[r]) * 5;
-  });
-
-  updateQuests();
-}
-
-function updateQuests() {
-  DEFINITIONS.quests.forEach((q) => {
-    if (!state.questsCompleted.has(q.id) && q.isDone(state)) {
-      state.questsCompleted.add(q.id);
-      setStatus(`Quest complete: ${q.title}`);
+    if (b.type === "miner") {
+      const node = state.nodes.find((n) => n.id === b.nodeId);
+      if (node) addOut(b, node.type, 0.65 * node.richness * speed);
+      return;
     }
-  });
-}
 
-function renderBuildMenu() {
-  buildMenu.innerHTML = "";
-  Object.entries(DEFINITIONS.buildings).forEach(([id, def]) => {
-    const btn = document.createElement("button");
-    btn.className = state.selectedBuild === id ? "active" : "";
-    btn.innerHTML = `<strong>${def.name}</strong><div class='small'>${Object.entries(def.cost)
-      .map(([k, v]) => `${k} ${v}`)
-      .join(", ")} | ${def.nodeOnly ? "Ore Node" : "Edge Ring"}</div>`;
-    btn.onclick = () => {
-      state.selectedBuild = state.selectedBuild === id ? null : id;
-      state.conveyorMode = false;
-      state.conveyorStart = null;
-      renderBuildMenu();
-      setStatus(state.selectedBuild ? `Build mode: ${def.name}` : "Build mode cleared.");
-    };
-    buildMenu.appendChild(btn);
-  });
+    const rt = DEF.buildings[b.type].recipeType;
+    if (!rt) return;
+    const recipe = DEF.recipes[rt][b.mode];
+    if (!recipe) return;
 
-  connectModeBtn.className = state.conveyorMode ? "active" : "";
-  connectModeBtn.textContent = `Conveyor Tool: ${state.conveyorMode ? "ON" : "OFF"}`;
-}
+    const can = Object.entries(recipe.in).every(([r, v]) => (b.input[r] || 0) >= v * speed);
+    if (!can) return;
 
-connectModeBtn.addEventListener("click", () => {
-  state.conveyorMode = !state.conveyorMode;
-  state.selectedBuild = null;
-  state.conveyorStart = null;
-  renderBuildMenu();
-  setStatus(state.conveyorMode ? "Conveyor tool enabled." : "Conveyor tool disabled.");
-});
-
-function renderQuestTree() {
-  questTree.innerHTML = "";
-  DEFINITIONS.quests.forEach((q) => {
-    const done = state.questsCompleted.has(q.id);
-    const item = document.createElement("div");
-    item.className = "small";
-    item.textContent = `${done ? "✅" : "⬜"} ${q.title} — ${q.hint}`;
-    questTree.appendChild(item);
-  });
-
-  const next = DEFINITIONS.quests.find((q) => !state.questsCompleted.has(q.id));
-  objectiveText.textContent = next ? `${next.title}: ${next.hint}` : "All starter quests complete. Expand and optimize your chain.";
-}
-
-function renderSelection() {
-  selectionActions.innerHTML = "";
-  const b = state.buildings.find((x) => x.id === state.selectedBuildingId);
-  if (!b) {
-    selectionText.textContent = "Nothing selected.";
-    return;
+    Object.entries(recipe.in).forEach(([r, v]) => {
+      b.input[r] -= v * speed;
+    });
+    Object.entries(recipe.out).forEach(([r, v]) => {
+      addOut(b, r, v * speed);
+    });
   }
 
-  const recipeType = DEFINITIONS.buildings[b.type].recipeType;
-  const recipeLabel = recipeType ? DEFINITIONS.recipes[recipeType][b.mode].label : "N/A";
-  selectionText.textContent = `${DEFINITIONS.buildings[b.type].name} | Lv.${b.level} | Recipe: ${recipeLabel}`;
+  function moveConveyor(c, ratio) {
+    const from = state.getBuilding(c.from);
+    const to = state.getBuilding(c.to);
+    if (!from || !to) return;
 
-  const upgrade = document.createElement("button");
-  const cost = { Rock: 10 * b.level };
-  upgrade.innerHTML = `<strong>Upgrade</strong><div class='small'>Rock ${cost.Rock}</div>`;
-  upgrade.onclick = () => {
-    if (!canAfford(cost)) return setStatus("Not enough Rock to upgrade."), undefined;
-    spend(cost);
-    b.level += 1;
-    setStatus("Building upgraded.");
-    renderSelection();
-    renderSidePanels();
+    const item = Object.entries(from.output).find(([, q]) => q > 0.2);
+    if (!item) return;
+
+    const [name] = item;
+    const amt = 0.5 * ratio;
+    if ((from.output[name] || 0) < amt) return;
+    from.output[name] -= amt;
+
+    if (to.type === "storage") state.wallet[name] = (state.wallet[name] || 0) + amt;
+    else to.input[name] = (to.input[name] || 0) + amt;
+  }
+
+  function updatePower() {
+    state.energyProduced = 0;
+    state.energyDemand = 0;
+    state.buildings.forEach((b) => {
+      const p = DEF.buildings[b.type].power;
+      if (p >= 0) state.energyDemand += p;
+      else if (state.wallet.Biomass > 0.03) {
+        state.wallet.Biomass -= 0.03;
+        state.energyProduced += Math.abs(p);
+      }
+    });
+    state.powerRatio = Math.min(1, state.energyProduced / Math.max(1, state.energyDemand));
+  }
+
+  function updateSimulation() {
+    const before = structuredClone(state.wallet);
+    updatePower();
+
+    state.buildings.forEach((b) => processBuilding(b, state.powerRatio));
+    state.conveyors.forEach((c) => {
+      moveConveyor(c, state.powerRatio);
+      c.t = (c.t + 0.015) % 1;
+      if (c.path?.length && c.payload) {
+        const idx = Math.floor(c.t * (c.path.length - 1));
+        c.payload.position.copyFrom(c.path[idx]);
+      }
+    });
+
+    state.rates = {};
+    Object.keys(state.wallet).forEach((r) => {
+      state.rates[r] = (state.wallet[r] - before[r]) * 5;
+    });
+
+    state.objectives.forEach((o, i) => {
+      if (o.done(state)) state.completed.add(i);
+    });
+  }
+
+  function renderBuildMenu() {
+    els.buildMenu.innerHTML = "";
+    Object.entries(DEF.buildings).forEach(([id, d]) => {
+      const btn = document.createElement("button");
+      btn.className = state.selectedBuild === id ? "active" : "";
+      btn.innerHTML = `<strong>${d.name}</strong><div class='small'>${Object.entries(d.cost)
+        .map(([k, v]) => `${k} ${v}`)
+        .join(", ")} | ${d.nodeOnly ? "Ore node only" : "Anywhere on planet"}</div>`;
+      btn.onclick = () => {
+        state.selectedBuild = state.selectedBuild === id ? null : id;
+        state.conveyorMode = false;
+        state.conveyorStartId = null;
+        renderBuildMenu();
+      };
+      els.buildMenu.appendChild(btn);
+    });
+
+    els.connect.className = state.conveyorMode ? "active" : "";
+    els.connect.textContent = `Conveyor Tool: ${state.conveyorMode ? "ON" : "OFF"}`;
+  }
+
+  els.connect.onclick = () => {
+    state.conveyorMode = !state.conveyorMode;
+    state.selectedBuild = null;
+    state.conveyorStartId = null;
+    renderBuildMenu();
+    setStatus(state.conveyorMode ? "Conveyor mode enabled." : "Conveyor mode disabled.");
   };
-  selectionActions.appendChild(upgrade);
 
-  if (recipeType) {
-    const cycle = document.createElement("button");
-    cycle.textContent = `Cycle Recipe (${recipeLabel})`;
-    cycle.onclick = () => {
-      const ks = Object.keys(DEFINITIONS.recipes[recipeType]);
-      const idx = ks.indexOf(b.mode);
-      b.mode = ks[(idx + 1) % ks.length];
+  function renderSelection() {
+    els.selectionActions.innerHTML = "";
+    const b = state.getBuilding(state.selectedBuildingId);
+    if (!b) {
+      els.selection.textContent = "Nothing selected.";
+      return;
+    }
+
+    const rt = DEF.buildings[b.type].recipeType;
+    const label = rt ? DEF.recipes[rt][b.mode].label : "N/A";
+    els.selection.textContent = `${DEF.buildings[b.type].name} | Lv.${b.level} | Recipe: ${label}`;
+
+    const up = document.createElement("button");
+    const cost = { Rock: 10 * b.level };
+    up.innerHTML = `<strong>Upgrade</strong><div class='small'>Rock ${cost.Rock}</div>`;
+    up.onclick = () => {
+      if (!canAfford(cost)) return setStatus("Not enough Rock.");
+      spend(cost);
+      b.level += 1;
       renderSelection();
     };
-    selectionActions.appendChild(cycle);
-  }
-}
+    els.selectionActions.appendChild(up);
 
-function renderSidePanels() {
-  resourceList.innerHTML = "";
-  Object.entries(state.wallet).forEach(([name, value]) => {
-    const row = document.createElement("div");
-    row.className = "small";
-    row.textContent = `${name}: ${value.toFixed(1)} (${(state.rates[name] || 0).toFixed(2)}/s)`;
-    resourceList.appendChild(row);
+    if (rt) {
+      const cycle = document.createElement("button");
+      cycle.textContent = `Cycle Recipe (${label})`;
+      cycle.onclick = () => {
+        const keys = Object.keys(DEF.recipes[rt]);
+        b.mode = keys[(keys.indexOf(b.mode) + 1) % keys.length];
+        renderSelection();
+      };
+      els.selectionActions.appendChild(cycle);
+    }
+  }
+
+  function renderSide() {
+    els.resourceList.innerHTML = "";
+    Object.entries(state.wallet).forEach(([k, v]) => {
+      const div = document.createElement("div");
+      div.className = "small";
+      div.textContent = `${k}: ${v.toFixed(1)} (${(state.rates[k] || 0).toFixed(2)}/s)`;
+      els.resourceList.appendChild(div);
+    });
+
+    els.energy.textContent = `Power ${state.energyProduced.toFixed(1)} / ${state.energyDemand.toFixed(1)} MW (${state.powerRatio < 1 ? "underpowered" : "stable"})`;
+
+    const next = state.objectives.findIndex((_, i) => !state.completed.has(i));
+    els.objective.textContent = `${next >= 0 ? `Next: ${state.objectives[next].text}` : "All starter objectives complete."}\n\n${state.objectives
+      .map((o, i) => `${state.completed.has(i) ? "✅" : "⬜"} ${o.text}`)
+      .join("\n")}`;
+  }
+
+  document.getElementById("gatherRockBtn").onclick = () => {
+    state.wallet.Rock += 4;
+    setStatus("Gathered Rock.");
+    renderSide();
+  };
+  document.getElementById("gatherWoodBtn").onclick = () => {
+    state.wallet.Wood += 3;
+    setStatus("Gathered Wood.");
+    renderSide();
+  };
+  document.getElementById("gatherBiomassBtn").onclick = () => {
+    state.wallet.Biomass += 2;
+    setStatus("Gathered Biomass.");
+    renderSide();
+  };
+
+  scene.onPointerObservable.add((info) => {
+    if (info.type !== BABYLON.PointerEventTypes.POINTERDOWN) return;
+    if (info.event.button !== 0) return;
+
+    const pick = scene.pick(scene.pointerX, scene.pointerY);
+    if (!pick?.hit) return;
+
+    if (state.conveyorMode) {
+      const b = pickBuildingFromMesh(pick.pickedMesh);
+      if (!b) return setStatus("Conveyors must connect buildings.");
+      if (!state.conveyorStartId) {
+        state.conveyorStartId = b.id;
+        return setStatus("Conveyor source selected.");
+      }
+      if (state.conveyorStartId === b.id) return setStatus("Cannot connect to itself.");
+      if (state.conveyors.some((c) => c.from === state.conveyorStartId && c.to === b.id)) {
+        state.conveyorStartId = null;
+        return setStatus("Conveyor already exists.");
+      }
+      state.conveyors.push({ from: state.conveyorStartId, to: b.id, t: Math.random(), path: null, payload: null });
+      state.conveyorStartId = null;
+      rebuildConveyorMeshes();
+      renderSide();
+      return setStatus("Conveyor placed.");
+    }
+
+    const placed = placeBuildingAtPick(pick);
+    if (!placed) {
+      const b = pickBuildingFromMesh(pick.pickedMesh);
+      state.selectedBuildingId = b?.id || null;
+      renderSelection();
+      if (b) setStatus(`Selected ${DEF.buildings[b.type].name}.`);
+    }
+    renderSide();
   });
 
-  energyText.textContent = `Power ${state.energyProduced.toFixed(1)} / ${state.energyDemand.toFixed(1)} MW (${state.powerRatio < 1 ? "underpowered" : "stable"})`;
-  automationText.textContent = `Buildings: ${state.buildings.length} | Conveyors: ${state.conveyors.length} | Miners: ${state.nodes.filter((n) => n.minerId).length}/${state.nodes.length}`;
-  renderQuestTree();
-}
-
-function drawOreCrystal(x, y, size, color) {
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.moveTo(x, y - size);
-  ctx.lineTo(x + size * 0.65, y - size * 0.1);
-  ctx.lineTo(x + size * 0.38, y + size * 0.75);
-  ctx.lineTo(x - size * 0.38, y + size * 0.75);
-  ctx.lineTo(x - size * 0.65, y - size * 0.1);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = "#ffffff66";
-  ctx.lineWidth = 1;
-  ctx.stroke();
-}
-
-function drawBuilding3D(building, p) {
-  const color = DEFINITIONS.buildings[building.type].color;
-  const size = 10 + building.level * 1.8;
-
-  ctx.fillStyle = "#00000033";
-  ctx.beginPath();
-  ctx.ellipse(p.x, p.y + size * 0.8, size * 0.8, size * 0.4, 0, 0, TAU);
-  ctx.fill();
-
-  ctx.fillStyle = color;
-  ctx.fillRect(p.x - size * 0.7, p.y - size * 0.8, size * 1.4, size * 1.2);
-
-  ctx.fillStyle = "#ffffff22";
-  ctx.fillRect(p.x - size * 0.7, p.y - size * 0.8, size * 1.4, size * 0.35);
-
-  if (state.selectedBuildingId === building.id) {
-    ctx.strokeStyle = "#7ef9ff";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, size + 4, 0, TAU);
-    ctx.stroke();
-  }
-}
-
-function draw() {
-  const w = canvas.width;
-  const h = canvas.height;
-  const R = Math.min(w, h) * 0.34 * state.zoom;
-
-  ctx.clearRect(0, 0, w, h);
-  const bg = ctx.createRadialGradient(w / 2 - 90, h / 2 - 110, 50, w / 2, h / 2, 460);
-  bg.addColorStop(0, "#213b61");
-  bg.addColorStop(1, "#0b1220");
-  ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, w, h);
-
-  const planetGrad = ctx.createRadialGradient(w / 2 - R * 0.3, h / 2 - R * 0.4 + state.tilt, R * 0.1, w / 2, h / 2 + state.tilt, R);
-  planetGrad.addColorStop(0, "#5075a5");
-  planetGrad.addColorStop(1, "#2d476d");
-  ctx.fillStyle = planetGrad;
-  ctx.beginPath();
-  ctx.arc(w / 2, h / 2 + state.tilt, R, 0, TAU);
-  ctx.fill();
-
-  ctx.strokeStyle = "#85bcff66";
-  ctx.lineWidth = 16;
-  ctx.beginPath();
-  ctx.arc(w / 2, h / 2 + state.tilt, R - 6, 0, TAU);
-  ctx.stroke();
-
-  const nodeColors = { "Iron Ore": "#c7d0d8", "Copper Ore": "#ffba72", Limestone: "#b7f5df" };
-  const nodeRender = state.nodes
-    .map((n) => ({ n, p: project(n.lat, n.lon) }))
-    .filter((x) => x.p.visible)
-    .sort((a, b) => a.p.z - b.p.z);
-
-  nodeRender.forEach(({ n, p }) => {
-    drawOreCrystal(p.x, p.y, 11, nodeColors[n.type]);
-    ctx.fillStyle = "#dbe8ff";
-    ctx.font = "11px sans-serif";
-    ctx.fillText(n.type, p.x - 24, p.y + 23);
+  engine.runRenderLoop(() => {
+    state.tick += 1;
+    if (state.tick % 12 === 0) {
+      updateSimulation();
+      renderSide();
+    }
+    planet.rotation.y += 0.001;
+    scene.render();
+    els.planetLabel.textContent = "Babylon.js 3D Planet | Place anywhere (miners on ore nodes)";
+    els.cameraLabel.textContent = `Radius ${camera.radius.toFixed(2)} ${state.conveyorMode ? "| Conveyor mode" : ""}`;
   });
 
-  state.conveyors.forEach((c, idx) => {
-    const from = state.buildings.find((b) => b.id === c.from);
-    const to = state.buildings.find((b) => b.id === c.to);
-    if (!from || !to) return;
-    const a = project(from.lat, from.lon);
-    const b = project(to.lat, to.lon);
-    if (!a.visible || !b.visible) return;
+  window.addEventListener("resize", () => engine.resize());
 
-    ctx.strokeStyle = "#89d7ff";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(a.x, a.y);
-    ctx.lineTo(b.x, b.y);
-    ctx.stroke();
-
-    c.t = (c.t + 0.012) % 1;
-    const x = a.x + (b.x - a.x) * c.t;
-    const y = a.y + (b.y - a.y) * c.t;
-    drawOreCrystal(x, y, 4, idx % 2 ? "#ffffff" : "#77ffc3");
-  });
-
-  const buildingRender = state.buildings
-    .map((b) => ({ b, p: project(b.lat, b.lon) }))
-    .filter((x) => x.p.visible)
-    .sort((a, b) => a.p.z - b.p.z);
-
-  buildingRender.forEach(({ b, p }) => drawBuilding3D(b, p));
-
-  planetLabel.textContent = "3D Circular Planet | Ore crystals + modular factories";
-  cameraLabel.textContent = `Rotation ${state.rotation.toFixed(2)} | Zoom ${state.zoom.toFixed(2)} ${state.conveyorMode ? "| Conveyor Tool" : ""}`;
-}
-
-canvas.addEventListener("mousedown", (e) => {
-  if (e.button !== 0) return;
-  state.dragging = true;
-  state.dragDistance = 0;
-  state.lastMouse = { x: e.clientX, y: e.clientY };
-});
-window.addEventListener("mouseup", () => {
-  state.dragging = false;
-});
-canvas.addEventListener("mousemove", (e) => {
-  if (!state.dragging) return;
-  const dx = e.clientX - state.lastMouse.x;
-  const dy = e.clientY - state.lastMouse.y;
-  state.dragDistance += Math.abs(dx) + Math.abs(dy);
-  state.lastMouse = { x: e.clientX, y: e.clientY };
-  state.rotation += dx * 0.005;
-  state.tilt += dy * 0.2;
-});
-canvas.addEventListener("wheel", (e) => {
-  e.preventDefault();
-  state.zoom *= e.deltaY < 0 ? 1.05 : 0.95;
-  state.zoom = Math.max(0.65, Math.min(2.0, state.zoom));
-});
-
-canvas.addEventListener("click", (e) => {
-  if (state.dragDistance > 8) return;
-  const rect = canvas.getBoundingClientRect();
-  const mx = ((e.clientX - rect.left) / rect.width) * canvas.width;
-  const my = ((e.clientY - rect.top) / rect.height) * canvas.height;
-
-  if (state.conveyorMode) return void placeConveyor(mx, my);
-  const placed = placeBuilding(mx, my);
-  if (!placed) {
-    const b = pickBuilding(mx, my);
-    state.selectedBuildingId = b?.id || null;
-    renderSelection();
-    setStatus(b ? `Selected ${DEFINITIONS.buildings[b.type].name}.` : "Nothing selected.");
-  }
-
-  renderSidePanels();
-});
-
-function loop() {
-  state.tick += 1;
-  if (state.tick % 12 === 0) {
-    updateSimulation();
-    renderSidePanels();
-  }
-  draw();
-  requestAnimationFrame(loop);
-}
-
-renderBuildMenu();
-renderSelection();
-renderSidePanels();
-setStatus("3D modular mode ready. Follow quests on the right.");
-requestAnimationFrame(loop);
+  renderBuildMenu();
+  renderSelection();
+  renderSide();
+  setStatus("Babylon.js mode active. Crafting pipeline fixed.");
+})();
