@@ -1,41 +1,27 @@
-# Cosmic Foundry
+# Cosmic Foundry (3D Circular Planet Build)
 
-Cosmic Foundry is a browser-based incremental automation game prototype where you grow from manual mining into a planetary and interplanetary industry.
+This build uses a **rotatable 3D circular planet** with Satisfactory-style factory flow.
 
-## Run
+## Core Loop
 
-Open `index.html` in a modern browser.
-
-## Core Features Implemented
-
-- **Interactive planet surface visualization** with curved terrain cells and camera controls (rotate, zoom, pan).
-- **Direct building placement** on terrain with zone validation and overlap prevention.
-- **Visible logistics links** (belt/power style links) and **animated drones** carrying resources.
-- **Resource chains** from raw extraction to late-game resources like Quantum Chips and Dark Matter Cores.
-- **Energy simulation** with production, demand, and brownouts that throttle buildings.
-- **Automation progression** with drone hubs, research upgrades, and orbital production.
-- **Research tree** unlocking copper, silicon, interplanetary expansion, and Dyson swarm mechanics.
-- **Planet expansion** including colonization, orbital factories, and satellite collectors.
-- **Prestige system**: Cosmic Reformation converts progress into permanent Cosmic Matter bonuses.
+- Place **Miners** directly on visible ore nodes (Iron Ore, Copper Ore, Limestone).
+- Place processing buildings (Smelter, Constructor, Storage, Power) on the **planet edge ring**.
+- Manually create **Conveyors** between buildings (source -> destination).
+- Chain production:
+  - Iron Ore -> Iron Ingot -> Iron Plate
+  - Copper Ore -> Copper Ingot -> Wire
+  - Limestone -> Concrete
 
 ## Controls
 
-- **Mouse drag**: rotate planet and pan surface.
+- **Drag** on canvas: rotate/tilt planet.
 - **Mouse wheel**: zoom.
-- **Click build button + click terrain cell**: place building.
-- **Click terrain cell without build mode**: inspect placement.
-- **Keyboard**: `Q/E` rotate, `A/D` pan.
+- Choose a building in Build Menu and click valid placement location.
+- Toggle **Conveyor Tool** and click source building then destination building.
+- Select a building to upgrade or cycle recipe.
+- Use **Manual Gather Rock** for starter economy.
 
-## Architecture Overview
+## Notes
 
-The implementation is intentionally data-driven and split by subsystem inside `game.js`:
-
-- **Renderer**: planet projection, terrain visualization, building/drones animations.
-- **Placement system**: terrain constraints, cost checks, occupancy checks.
-- **Resource simulation**: per-building production recipes and per-tick resource rates.
-- **Logistics simulation**: links and drone path interpolation.
-- **Energy grid**: demand/production + power ratio effects.
-- **Research + prestige systems**: unlock gates and permanent multipliers.
-- **Planet model**: supports multiple colonies with varying terrain/resource richness.
-
-The `BUILDINGS`, `RESEARCH`, and `PLANETS` definitions are declarative to keep future expansion easy.
+- This version intentionally focuses on 3D circular planet interaction and node->conveyor->processing gameplay.
+- Research/expansion/prestige UI is temporarily simplified while the core 3D factory loop is emphasized.
