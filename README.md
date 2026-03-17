@@ -1,32 +1,27 @@
-# Cosmic Foundry (2D Factory Build)
+# Cosmic Foundry (3D Circular Planet Build)
 
-This version pivots to a **2D Satisfactory-style factory prototype**:
+This build uses a **rotatable 3D circular planet** with Satisfactory-style factory flow.
 
-- Buildings are placed on **edge slots** around the map.
-- **Ore nodes** (Iron, Copper, Limestone) exist in-map.
-- **Miners must be placed directly on ore nodes**.
-- **Conveyors are manually placed** between buildings.
-- Conveyors route ore/components into **Smelters**, **Constructors**, or **Storage**.
+## Core Loop
 
-## Run
-
-Open `index.html` in a browser.
+- Place **Miners** directly on visible ore nodes (Iron Ore, Copper Ore, Limestone).
+- Place processing buildings (Smelter, Constructor, Storage, Power) on the **planet edge ring**.
+- Manually create **Conveyors** between buildings (source -> destination).
+- Chain production:
+  - Iron Ore -> Iron Ingot -> Iron Plate
+  - Copper Ore -> Copper Ingot -> Wire
+  - Limestone -> Concrete
 
 ## Controls
 
-- Select a building from **Build Menu**, then click valid placement:
-  - Miner: ore node only
-  - Smelter / Constructor / Storage / Power: edge slot only
-- Toggle **Conveyor Tool**:
-  - click source building
-  - click destination building
-- Click a building to select it and use **upgrade** / **recipe mode** controls.
-- **Manual Gather Rock** gives starter build currency.
+- **Drag** on canvas: rotate/tilt planet.
+- **Mouse wheel**: zoom.
+- Choose a building in Build Menu and click valid placement location.
+- Toggle **Conveyor Tool** and click source building then destination building.
+- Select a building to upgrade or cycle recipe.
+- Use **Manual Gather Rock** for starter economy.
 
-## Crafting Flow (Satisfactory-inspired)
+## Notes
 
-- Iron Ore → Smelter (iron recipe) → Iron Ingot → Constructor (plate recipe) → Iron Plate
-- Copper Ore → Smelter (copper recipe) → Copper Ingot → Constructor (wire recipe) → Wire
-- Limestone → Constructor (concrete recipe) → Concrete
-
-Storage acts as a sink that adds incoming items to your wallet/resources.
+- This version intentionally focuses on 3D circular planet interaction and node->conveyor->processing gameplay.
+- Research/expansion/prestige UI is temporarily simplified while the core 3D factory loop is emphasized.
