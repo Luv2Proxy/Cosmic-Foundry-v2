@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cosmic Foundry</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header class="top-bar">
+        <h1>Cosmic Foundry</h1>
+        <div id="statusText">Initializing planetary fabricator…</div>
+      </header>
+
+      <aside class="left-panel">
+        <section>
+          <h2>Resources</h2>
+          <div id="resourceList" class="grid-list"></div>
+        </section>
+        <section>
+          <h2>Manual Gathering</h2>
+          <div class="grid-list">
+            <button id="gatherRockBtn">Gather Rock (+4)</button>
+            <button id="gatherWoodBtn">Gather Wood (+3)</button>
+            <button id="gatherBiomassBtn">Gather Biomass (+2)</button>
+          </div>
+        </section>
+        <section>
+          <h2>Energy</h2>
+          <div id="energyText"></div>
+        </section>
+      </aside>
+
+      <main class="viewport-wrap">
+        <canvas id="planetCanvas" width="1200" height="740"></canvas>
+        <div class="hud-overlay">
+          <span id="planetLabel"></span>
+          <span id="cameraLabel"></span>
+        </div>
+      </main>
+
+      <aside class="right-panel">
+        <section>
+          <h2>Build Menu</h2>
+          <div id="buildMenu" class="grid-list"></div>
+          <button id="connectModeBtn">Conveyor Tool: OFF</button>
+          <div class="small">Conveyors move source OUTPUT -> destination INPUT.</div>
+        </section>
+        <section>
+          <h2>Objectives</h2>
+          <div id="objectiveText" class="small"></div>
+        </section>
+        <section>
+          <h2>Selected</h2>
+          <div id="selectionText">Nothing selected.</div>
+          <div id="selectionActions" class="grid-list"></div>
+        </section>
+      </aside>
+    </div>
+
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="game.js"></script>
+  </body>
+</html>
