@@ -1,22 +1,25 @@
-# Cosmic Foundry — Custom 3D Planet Engine Rewrite
+# Cosmic Foundry — Babylon.js 3D Planet Rewrite
 
-This version is a full rewrite with a **custom in-project 3D planet engine** (canvas-based), focused on making factory logic actually work.
+This version now uses **Babylon.js** as requested.
 
-## Major fixes
+## What changed
 
-- Buildings now process correctly with strict pipeline:
-  - **Conveyor reads source `output`**
-  - **Conveyor writes destination `input`** (or wallet for Storage)
-  - Crafting consumes `input` and creates crafted `output`
-- This fixes the previous issue where items were effectively passed through without producing crafted outputs.
+- Replaced the prior rendering path with Babylon.js scene/camera/light/mesh pipeline.
+- Planet is a true 3D sphere with orbit camera controls.
+- Ore nodes render as colored mesh **splotches + crystal meshes**.
+- Buildings are 3D meshes and can be placed **anywhere on the planet**.
+- **Miner placement remains ore-node-only**.
 
-## Visual / interaction changes
+## Crafting logic fix
 
-- 3D circular planet with rotation + tilt + zoom controls
-- Visible ore nodes as **colored splotches + crystal meshes**
-- 3D-styled buildings and animated conveyor payloads
-- Building placement anywhere on planet surface
-- **Miner still restricted to ore nodes only**
+Factory flow is now strict and correct:
+
+- Buildings craft from `input` using selected recipe.
+- Crafted items are written to `output`.
+- Conveyors move **source `output` -> destination `input`**.
+- Storage converts incoming items into wallet resources.
+
+This prevents raw input pass-through behavior.
 
 ## Manual gathering
 
@@ -24,19 +27,15 @@ This version is a full rewrite with a **custom in-project 3D planet engine** (ca
 - Gather Wood
 - Gather Biomass
 
-Biomass is consumed by Biomass Burners to generate power.
+Biomass Burners consume Biomass to generate energy.
 
-## Data-driven modular setup
+## Modular content
 
-The game is defined via `DEF` in `game.js`:
+Content is centralized in `DEF` in `game.js`:
 
 - `DEF.resources`
 - `DEF.buildings`
 - `DEF.recipes`
 - `DEF.nodes`
 
-Add new content by extending those definitions.
-
-## Guidance
-
-Right panel includes a “next objective” plus checklist so it is clear what to do at each step.
+Add new buildings/recipes/resources by extending these definitions.
