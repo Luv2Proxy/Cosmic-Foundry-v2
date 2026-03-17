@@ -20,12 +20,12 @@
       },
     },
     nodes: [
-      { lat: 0.25, lon: 0.2, type: "Iron Ore", richness: 1.1, color: "#b8c2cf" },
-      { lat: -0.2, lon: 1.3, type: "Copper Ore", richness: 1.0, color: "#ffb26b" },
-      { lat: 0.4, lon: 2.2, type: "Limestone", richness: 1.2, color: "#b7f5df" },
-      { lat: -0.1, lon: 3.0, type: "Iron Ore", richness: 0.9, color: "#b8c2cf" },
-      { lat: 0.33, lon: 4.15, type: "Copper Ore", richness: 1.1, color: "#ffb26b" },
-      { lat: -0.35, lon: 5.0, type: "Limestone", richness: 1.0, color: "#b7f5df" },
+      { lat: 0.22, lon: 0.15, type: "Iron Ore", richness: 1.1, color: "#b8c2cf" },
+      { lat: -0.18, lon: 0.9, type: "Copper Ore", richness: 1.0, color: "#ffb26b" },
+      { lat: 0.38, lon: 1.65, type: "Limestone", richness: 1.2, color: "#b7f5df" },
+      { lat: -0.28, lon: 2.4, type: "Iron Ore", richness: 0.95, color: "#b8c2cf" },
+      { lat: 0.3, lon: 3.4, type: "Copper Ore", richness: 1.1, color: "#ffb26b" },
+      { lat: -0.35, lon: 4.2, type: "Limestone", richness: 1.0, color: "#b7f5df" },
     ],
   };
 
@@ -139,27 +139,37 @@
   }
 
   function createNodeSplotch(node) {
-    const pos = sphToVec(node.lat, node.lon, planetRadius + 0.01);
+    const pos = sphToVec(node.lat, node.lon, planetRadius + 0.02);
     const up = pos.normalize();
 
-    const splotch = BABYLON.MeshBuilder.CreateDisc(`s-${node.id}`, { radius: 0.52, tessellation: 36 }, scene);
+    const splotch = BABYLON.MeshBuilder.CreateDisc(`s-${node.id}`, { radius: 0.62, tessellation: 36 }, scene);
     splotch.position = pos;
     splotch.lookAt(pos.add(up));
 
     const sMat = new BABYLON.StandardMaterial(`sm-${node.id}`, scene);
     sMat.diffuseColor = hexColor(node.color);
-    sMat.alpha = 0.45;
+    sMat.emissiveColor = hexColor(node.color).scale(0.25);
+    sMat.alpha = 0.75;
+    sMat.backFaceCulling = false;
     splotch.material = sMat;
 
-    const crystal = BABYLON.MeshBuilder.CreatePolyhedron(`c-${node.id}`, { type: 1, size: 0.15 }, scene);
-    crystal.position = pos.add(up.scale(0.14));
+    const crystal = BABYLON.MeshBuilder.CreatePolyhedron(`c-${node.id}`, { type: 1, size: 0.2 }, scene);
+    crystal.position = pos.add(up.scale(0.2));
     const cMat = new BABYLON.StandardMaterial(`cm-${node.id}`, scene);
     cMat.diffuseColor = hexColor(node.color);
-    cMat.emissiveColor = hexColor(node.color).scale(0.35);
+    cMat.emissiveColor = hexColor(node.color).scale(0.6);
+    cMat.specularColor = new BABYLON.Color3(0.8, 0.8, 0.8);
     crystal.material = cMat;
 
+    const beacon = BABYLON.MeshBuilder.CreateSphere(`beacon-${node.id}`, { diameter: 0.08 }, scene);
+    beacon.position = pos.add(up.scale(0.42));
+    const bMat = new BABYLON.StandardMaterial(`bm-${node.id}`, scene);
+    bMat.emissiveColor = hexColor(node.color).scale(1.4);
+    bMat.disableLighting = true;
+    beacon.material = bMat;
+
     node.marker = crystal;
-    nodeMeshes.push(splotch, crystal);
+    nodeMeshes.push(splotch, crystal, beacon);
   }
 
   state.nodes.forEach(createNodeSplotch);
@@ -494,5 +504,5 @@
   renderBuildMenu();
   renderSelection();
   renderSide();
-  setStatus("Babylon.js mode active. Crafting pipeline fixed.");
+  setStatus("Babylon.js mode active. Look for bright colored ore splotches on the planet.");
 })();
