@@ -139,12 +139,12 @@
   }
 
   function createNodeSplotch(node) {
-    const pos = sphToVec(node.lat, node.lon, planetRadius + 0.02);
+    const pos = sphToVec(node.lat, node.lon, planetRadius + 0.2);
     const up = pos.normalize();
 
-    const splotch = BABYLON.MeshBuilder.CreateDisc(`s-${node.id}`, { radius: 0.62, tessellation: 36 }, scene);
+    const splotch = BABYLON.MeshBuilder.CreateSphere(`s-${node.id}`, {diameter: 1.2}, scene);
     splotch.position = pos;
-    splotch.lookAt(pos.add(up));
+    splotch.setDirection(up);
 
     const sMat = new BABYLON.StandardMaterial(`sm-${node.id}`, scene);
     sMat.diffuseColor = hexColor(node.color);
